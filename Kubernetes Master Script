@@ -1,0 +1,49 @@
+===========In Master Node only====================
+
+#!/bin/bash
+
+set -e
+
+echo "========== Installing Required Dependencies =========="
+apt-get update -y
+apt-get install -y conntrack socat ebtables ipset
+
+echo "========== Initializing Kubernetes Master =========="
+
+kubeadm init
+
+# If CRI socket error occurs, use:
+# kubeadm init --cri-socket /run/containerd/containerd.sock
+
+echo "========== Configuring kubectl for Normal User =========="
+
+# Detect the original user who ran sudo
+USER_NAME=${SUDO_USER}
+USER_HOME=$(eval echo ~$USER_NAME)
+
+mkdir -p $USER_HOME/.kube
+cp -i /etc/kubernetes/admin.conf $USER_HOME/.kube/config
+chown $(id -u $USER_NAME):$(id -g $USER_NAME) $USER_HOME/.kube/config
+
+echo "========== Verifying Cluster =========="
+
+su - $USER_NAME -c "kubectl get nodes"
+su - $USER_NAME -c "kubectl get pods -n kube-system"
+
+echo "========== Installing Weave Net CNI =========="
+
+su - $USER_NAME -c "kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml"
+
+echo "Waiting for Pods to stabilize..."
+sleep 30
+
+echo "========== Final Cluster Status =========="
+
+su - $USER_NAME -c "kubectl get nodes"
+su - $USER_NAME -c "kubectl get pods --all-namespaces"
+
+echo "========== Worker Join Command =========="
+
+kubeadm token create --print-join-command
+
+echo "========== Kubernetes Master Setup Completed Successfully =========="
