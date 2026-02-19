@@ -1,0 +1,23 @@
+Add Worker Machines to Kubernates Master
+=========================================
+
+Copy kubeadm join token from and execute in Worker Nodes to join to cluster
+
+exceute in worker machines 
+
+kubectl commonds has to be executed in master machine.
+
+
+=========execute only in master===========================
+# Configure kubectl  exit as root user & exeucte as normal ubuntu user
+exit
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+Check Nodes 
+=============
+
+kubectl get nodes
