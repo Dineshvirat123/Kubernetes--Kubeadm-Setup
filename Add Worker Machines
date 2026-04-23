@@ -1,5 +1,22 @@
+
+Go to:
+
+👉 EC2 → Master Instance and worker nodes(→ Security Group → Inbound Rules
+
+Add these rules:
+1️⃣ Kubernetes API access
+Type: Custom TCP
+Port: 6443
+Source: Worker node private IP OR same Security Group
+
+RUN kubeadm init ---------->  in master node
+
+copy join token 
 Add Worker Machines to Kubernates Master
 =========================================
+
+sudo apt update
+sudo apt install -y conntrack
 
 Copy kubeadm join token from and execute in Worker Nodes to join to cluster
 
@@ -15,6 +32,8 @@ exit
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
 
 Check Nodes 
