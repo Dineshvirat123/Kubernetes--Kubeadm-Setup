@@ -5,36 +5,20 @@ Go to:
 
 Add these rules:
 1️⃣ Kubernetes API access
-Type: Custom TCP
-Port: 6443
+Type: all TCP
+Port: all
 Source: Worker node private IP OR same Security Group
 
-RUN kubeadm init ---------->  in master node
-
-copy join token 
-Add Worker Machines to Kubernates Master
-=========================================
-
-sudo apt update
-sudo apt install -y conntrack
-
-Copy kubeadm join token from and execute in Worker Nodes to join to cluster
-
-exceute in worker machines 
-
-kubectl commonds has to be executed in master machine.
-
-
-=========execute only in master===========================
-# Configure kubectl  exit as root user & exeucte as normal ubuntu user
-exit
-
+==========only in master node===========
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml ---------->  in master node
 
+
+
+copy join token from master node and paste in worker nodes
 
 Check Nodes 
 =============
