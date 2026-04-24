@@ -4,46 +4,75 @@
 
 set -e
 
-echo "========== Installing Required Dependencies =========="
+echo "===== Kubernetes Master Initialization Started ====="
+
+# -------- CONFIG --------
+
+POD_NETWORK="calico"   # calico | weave
+USE_PUBLIC_IP="false"
+PUBLIC_IP=""
+API_PORT="6443"
+CRI_SOCKET="/run/containerd/containerd.sock"
+
+# -----------------------
+
+echo "---- Step 1: Install conntrack ----"
 apt-get update -y
-apt-get install -y conntrack socat ebtables ipset
+apt-get install -y conntrack
 
-echo "========== Initializing Kubernetes Master =========="
+echo "conntrack version:"
+conntrack -V
 
-kubeadm init
+echo "---- Step 2: Initialize Kubernetes ----"
 
-# If CRI socket error occurs, use:
-# kubeadm init --cri-socket /run/containerd/containerd.sock
+if [ "$USE_PUBLIC_IP" = "true" ] && [ -n "$PUBLIC_IP" ]; then
+INIT_CMD="kubeadm init --control-plane-endpoint ${PUBLIC_IP}:${API_PORT}"
+else
+INIT_CMD="kubeadm init"
+fi
 
-echo "========== Configuring kubectl for Normal User =========="
+echo "Running: $INIT_CMD"
 
-# Detect the original user who ran sudo
-USER_NAME=${SUDO_USER}
+# Try normal init
+
+if ! $INIT_CMD; then
+echo "⚠️ kubeadm init failed. Retrying with CRI socket..."
+kubeadm init --cri-socket $CRI_SOCKET
+fi
+
+echo "---- Step 3: Configure kubectl for user ----"
+
+USER_NAME=${SUDO_USER:-ubuntu}
 USER_HOME=$(eval echo ~$USER_NAME)
 
 mkdir -p $USER_HOME/.kube
 cp -i /etc/kubernetes/admin.conf $USER_HOME/.kube/config
-chown $(id -u $USER_NAME):$(id -g $USER_NAME) $USER_HOME/.kube/config
+chown $USER_NAME:$USER_NAME $USER_HOME/.kube/config
 
-echo "========== Verifying Cluster =========="
+echo "---- Step 4: Verify cluster ----"
+sudo -u $USER_NAME kubectl get nodes
 
-su - $USER_NAME -c "kubectl get nodes"
-su - $USER_NAME -c "kubectl get pods -n kube-system"
+echo "---- Step 5: Install Network Addon ($POD_NETWORK) ----"
 
-echo "========== Installing Weave Net CNI =========="
+if [ "$POD_NETWORK" = "weave" ]; then
+sudo -u $USER_NAME kubectl apply -f 
+https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+elif [ "$POD_NETWORK" = "calico" ]; then
+sudo -u $USER_NAME kubectl apply -f 
+https://docs.projectcalico.org/manifests/calico.yaml
+else
+echo "❌ Invalid POD_NETWORK value"
+exit 1
+fi
 
-su - $USER_NAME -c "kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml"
+echo "---- Step 6: Wait for Pods ----"
+sleep 20
 
-echo "Waiting for Pods to stabilize..."
-sleep 30
+sudo -u $USER_NAME kubectl get pods -n kube-system
+sudo -u $USER_NAME kubectl get nodes
 
-echo "========== Final Cluster Status =========="
-
-su - $USER_NAME -c "kubectl get nodes"
-su - $USER_NAME -c "kubectl get pods --all-namespaces"
-
-echo "========== Worker Join Command =========="
-
+echo "---- Step 7: Join Command ----"
 kubeadm token create --print-join-command
 
-echo "========== Kubernetes Master Setup Completed Successfully =========="
+echo "===== Kubernetes Master Setup Completed ====="
+
